@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_hamt::{HashAlgorithm};
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::MethodNum;
 
@@ -21,5 +22,5 @@ pub trait ActorCode {
         // hold onto state between transactions.
         // https://github.com/filecoin-project/builtin-actors/issues/133
         BS: Blockstore + Clone,
-        RT: Runtime<BS>;
+        RT: Runtime<BS> + HashAlgorithm;
 }

@@ -45,6 +45,11 @@ use crate::runtime::{
 use crate::{actor_error, ActorError};
 use libsecp256k1::{recover, Message, RecoveryId, Signature as EcsdaSignature};
 
+use {
+    fvm_ipld_hamt::{Hash, HashAlgorithm, HashedKey},
+    std::hash::Hasher,
+};
+
 lazy_static! {
     pub static ref SYSTEM_ACTOR_CODE_ID: Cid = make_builtin(b"fil/test/system");
     pub static ref INIT_ACTOR_CODE_ID: Cid = make_builtin(b"fil/test/init");
@@ -147,6 +152,8 @@ pub struct MockRuntime {
     pub policy: Policy,
 
     pub circulating_supply: TokenAmount,
+
+    hash_proc_buff: Vec<u8>,
 }
 
 #[derive(Default)]
@@ -285,6 +292,7 @@ impl Default for MockRuntime {
             expectations: Default::default(),
             policy: Default::default(),
             circulating_supply: Default::default(),
+            hash_proc_buff: Default::default(),
         }
     }
 }
@@ -1339,4 +1347,39 @@ pub fn new_bls_addr(s: u8) -> Address {
     let mut key = [0u8; 48];
     rng.fill_bytes(&mut key);
     Address::new_bls(&key).unwrap()
+}
+
+impl MockRuntime {
+    pub fn finalize(&mut self) -> HashedKey {
+        let mut rval: HashedKey = Default::default();
+
+        rval.copy_from_slice(
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, &self.hash_proc_buff),
+        );
+
+        self.hash_proc_buff = vec![];
+
+        rval
+    }
+}
+
+impl Hasher for MockRuntime {
+    fn finish(&self) -> u64 {
+        // u64 hash not used in hamt
+        0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.hash_proc_buff.extend_from_slice(bytes);
+    }
+}
+
+impl HashAlgorithm for MockRuntime {
+    fn rt_hash<X>(&mut self, key: &X) -> HashedKey
+    where
+        X: Hash + ?Sized,
+    {
+        key.hash(self);
+        self.finalize().into()
+    }
 }

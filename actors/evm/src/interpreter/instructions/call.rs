@@ -14,6 +14,7 @@ use {
     fil_actors_runtime::runtime::Runtime,
     fvm_ipld_blockstore::Blockstore,
     fvm_shared::econ::TokenAmount,
+	fvm_ipld_hamt::{HashAlgorithm},
 };
 
 /// The kind of call-like instruction.
@@ -104,11 +105,15 @@ pub fn codecopy(state: &mut ExecutionState, code: &[u8]) -> Result<(), StatusCod
     })
 }
 
-pub fn call<'r, BS: Blockstore, RT: Runtime<BS>>(
+pub fn call<'r, BS, RT>(
     state: &mut ExecutionState,
     platform: &'r System<'r, BS, RT>,
     kind: CallKind,
-) -> Result<(), StatusCode> {
+) -> Result<(), StatusCode>
+where
+	BS: Blockstore,
+	RT: Runtime<BS> + HashAlgorithm
+{
     let ExecutionState { stack, memory, .. } = state;
     let rt = &*platform.rt; // as immutable reference
 

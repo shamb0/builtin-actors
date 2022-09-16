@@ -13,7 +13,7 @@ use {
     fvm_ipld_blockstore::Blockstore,
     fvm_ipld_encoding::tuple::*,
     fvm_ipld_encoding::RawBytes,
-    fvm_ipld_hamt::Hamt,
+    fvm_ipld_hamt::{Hamt, HashAlgorithm},
     fvm_shared::error::*,
     fvm_shared::{MethodNum, METHOD_CONSTRUCTOR},
     num_derive::FromPrimitive,
@@ -39,7 +39,7 @@ impl EvmContractActor {
     pub fn constructor<BS, RT>(rt: &mut RT, params: ConstructorParams) -> Result<(), ActorError>
     where
         BS: Blockstore + Clone,
-        RT: Runtime<BS>,
+        RT: Runtime<BS> + HashAlgorithm,
     {
         rt.validate_immediate_caller_accept_any()?;
 
@@ -112,7 +112,7 @@ impl EvmContractActor {
     ) -> Result<RawBytes, ActorError>
     where
         BS: Blockstore + Clone,
-        RT: Runtime<BS>,
+        RT: Runtime<BS> + HashAlgorithm,
     {
         rt.validate_immediate_caller_accept_any()?;
 
@@ -184,7 +184,7 @@ impl ActorCode for EvmContractActor {
     ) -> Result<RawBytes, ActorError>
     where
         BS: Blockstore + Clone,
-        RT: Runtime<BS>,
+        RT: Runtime<BS> + HashAlgorithm,
     {
         match FromPrimitive::from_u64(method) {
             Some(Method::Constructor) => {

@@ -5,7 +5,7 @@ use {
     cid::Cid,
     fil_actors_runtime::{runtime::Runtime, ActorError},
     fvm_ipld_blockstore::Blockstore,
-    fvm_ipld_hamt::Hamt,
+    fvm_ipld_hamt::{Hamt, HashAlgorithm},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -24,20 +24,33 @@ pub enum StorageStatus {
 
 /// Platform Abstraction Layer
 /// that bridges the FVM world to EVM world
-pub struct System<'r, BS: Blockstore, RT: Runtime<BS>> {
+pub struct System<'r, BS, RT>
+where
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
+{
     pub rt: &'r mut RT,
     state: &'r mut Hamt<BS, U256, U256>,
+    hash_proc_buff: Vec<u8>,
 }
 
-impl<'r, BS: Blockstore, RT: Runtime<BS>> System<'r, BS, RT> {
+impl<'r, BS, RT> System<'r, BS, RT>
+where
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
+{
     pub fn new(rt: &'r mut RT, state: &'r mut Hamt<BS, U256, U256>) -> anyhow::Result<Self> {
-        Ok(Self { rt, state })
+        Ok(Self { rt, state, hash_proc_buff: vec![] })
     }
 
     /// Reborrow the system with a shorter lifetime.
     #[allow(clippy::needless_lifetimes)]
     pub fn reborrow<'a>(&'a mut self) -> System<'a, BS, RT> {
-        System { rt: &mut *self.rt, state: &mut *self.state }
+        System {
+            rt: &mut *self.rt,
+            state: &mut *self.state,
+            hash_proc_buff: (&mut *self.hash_proc_buff).to_vec(),
+        }
     }
 
     pub fn flush_state(&mut self) -> Result<Cid, ActorError> {
@@ -49,7 +62,11 @@ impl<'r, BS: Blockstore, RT: Runtime<BS>> System<'r, BS, RT> {
         let mut key_bytes = [0u8; 32];
         key.to_big_endian(&mut key_bytes);
 
-        Ok(self.state.get(&key).map_err(|e| StatusCode::InternalError(e.to_string()))?.cloned())
+        Ok(self
+            .state
+            .get::<_, _>(&key, self.rt)
+            .map_err(|e| StatusCode::InternalError(e.to_string()))?
+            .cloned())
     }
 
     /// Set value of a storage key.
@@ -61,18 +78,23 @@ impl<'r, BS: Blockstore, RT: Runtime<BS>> System<'r, BS, RT> {
         let mut key_bytes = [0u8; 32];
         key.to_big_endian(&mut key_bytes);
 
-        let prev_value =
-            self.state.get(&key).map_err(|e| StatusCode::InternalError(e.to_string()))?.cloned();
+        let prev_value = self
+            .state
+            .get::<_, _>(&key, self.rt)
+            .map_err(|e| StatusCode::InternalError(e.to_string()))?
+            .cloned();
 
         let mut storage_status =
             if prev_value == value { StorageStatus::Unchanged } else { StorageStatus::Modified };
 
         if value.is_none() {
-            self.state.delete(&key).map_err(|e| StatusCode::InternalError(e.to_string()))?;
+            self.state
+                .delete::<_, _>(&key, self.rt)
+                .map_err(|e| StatusCode::InternalError(e.to_string()))?;
             storage_status = StorageStatus::Deleted;
         } else {
             self.state
-                .set(key, value.unwrap())
+                .set::<_>(key, value.unwrap(), self.rt)
                 .map_err(|e| StatusCode::InternalError(e.to_string()))?;
         }
 

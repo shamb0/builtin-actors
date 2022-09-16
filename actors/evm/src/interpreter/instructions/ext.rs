@@ -2,13 +2,18 @@ use {
     crate::interpreter::{ExecutionState, StatusCode, System},
     fil_actors_runtime::runtime::Runtime,
     fvm_ipld_blockstore::Blockstore,
+	fvm_ipld_hamt::{HashAlgorithm},
 };
 
 #[inline]
-pub fn extcodesize<'r, BS: Blockstore, RT: Runtime<BS>>(
+pub fn extcodesize<'r, BS, RT>(
     _state: &mut ExecutionState,
     _platform: &'r System<'r, BS, RT>,
-) -> Result<(), StatusCode> {
+) -> Result<(), StatusCode>
+where
+	BS: Blockstore,
+	RT: Runtime<BS> + HashAlgorithm
+{
     // TODO
     //  1. call actor::get_actor_code_cid
     //  2. check that it matches our code CID (it's an EVM actor)
@@ -18,18 +23,25 @@ pub fn extcodesize<'r, BS: Blockstore, RT: Runtime<BS>>(
     todo!()
 }
 
-pub fn extcodehash<'r, BS: Blockstore, RT: Runtime<BS>>(
+pub fn extcodehash<'r, BS, RT>(
     _state: &mut ExecutionState,
     _platform: &'r System<'r, BS, RT>,
-) -> Result<(), StatusCode> {
+) -> Result<(), StatusCode>
+where
+	BS: Blockstore,
+	RT: Runtime<BS> + HashAlgorithm
+{
     // TODO
-
     todo!();
 }
 
-pub fn extcodecopy<'r, BS: Blockstore, RT: Runtime<BS>>(
+pub fn extcodecopy<'r, BS, RT>(
     _state: &mut ExecutionState,
     _platform: &'r System<'r, BS, RT>,
-) -> Result<(), StatusCode> {
+) -> Result<(), StatusCode>
+where
+	BS: Blockstore,
+	RT: Runtime<BS> + HashAlgorithm
+{
     todo!();
 }

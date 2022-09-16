@@ -14,6 +14,7 @@ use {
     bytes::Bytes,
     fil_actors_runtime::runtime::Runtime,
     fvm_ipld_blockstore::Blockstore,
+	fvm_ipld_hamt::{HashAlgorithm},
 };
 
 /// EVM execution runtime.
@@ -41,7 +42,11 @@ impl ExecutionState {
     }
 }
 
-struct Machine<'r, BS: Blockstore, RT: Runtime<BS>> {
+pub struct Machine<'r, BS, RT>
+where
+	BS: Blockstore,
+	RT: Runtime<BS> + HashAlgorithm,
+{
     system: &'r mut System<'r, BS, RT>,
     runtime: &'r mut ExecutionState,
     bytecode: &'r Bytecode<'r>,
@@ -92,7 +97,12 @@ macro_rules! def_ins {
     }
 }
 
-impl<'r, BS: Blockstore + 'r, RT: Runtime<BS> + 'r> Machine<'r, BS, RT> {
+
+impl<'r, BS, RT> Machine<'r, BS, RT>
+where
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
+{
     pub fn new(
         system: &'r mut System<'r, BS, RT>,
         runtime: &'r mut ExecutionState,
@@ -854,11 +864,15 @@ impl<'r, BS: Blockstore + 'r, RT: Runtime<BS> + 'r> Machine<'r, BS, RT> {
     const JMPTABLE: [Instruction<Machine<'r, BS, RT>>; 256] = Machine::<'r, BS, RT>::jmptable();
 }
 
-pub fn execute<'r, BS: Blockstore, RT: Runtime<BS>>(
+pub fn execute<'r, BS, RT>(
     bytecode: &'r Bytecode,
     runtime: &'r mut ExecutionState,
     system: &'r mut System<'r, BS, RT>,
-) -> Result<Output, StatusCode> {
+) -> Result<Output, StatusCode>
+where
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
+{
     let mut m = Machine::new(system, runtime, bytecode);
     m.execute()?;
     Ok(Output {

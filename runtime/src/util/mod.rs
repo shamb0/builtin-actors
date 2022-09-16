@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub use self::downcast::*;
+pub use self::hamt_hash_algorithm::Sha2HasherWrapper;
 pub use self::message_accumulator::MessageAccumulator;
 pub use self::multimap::*;
 pub use self::set::Set;
@@ -10,6 +11,7 @@ pub use self::set_multimap::SetMultimap;
 pub mod cbor;
 pub mod chaos;
 mod downcast;
+mod hamt_hash_algorithm;
 mod message_accumulator;
 mod multimap;
 mod set;

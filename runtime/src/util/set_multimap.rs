@@ -5,7 +5,7 @@ use std::borrow::Borrow;
 
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_hamt::Error;
+use fvm_ipld_hamt::{Error, HashAlgorithm};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::deal::DealID;
 use fvm_shared::HAMT_BIT_WIDTH;
@@ -38,41 +38,60 @@ where
     }
 
     /// Puts the DealID in the hash set of the key.
-    pub fn put(&mut self, key: ChainEpoch, value: DealID) -> Result<(), Error> {
+    pub fn put<HA>(
+        &mut self,
+        key: ChainEpoch,
+        value: DealID,
+        hash_algo: &mut HA,
+    ) -> Result<(), Error>
+    where
+        HA: HashAlgorithm,
+    {
         // Get construct amt from retrieved cid or create new
-        let mut set = self.get(key)?.unwrap_or_else(|| Set::new(self.0.store()));
+        let mut set = self.get::<_>(key, hash_algo)?.unwrap_or_else(|| Set::new(self.0.store()));
 
-        set.put(u64_key(value))?;
+        set.put::<_>(u64_key(value), hash_algo)?;
 
         // Save and calculate new root
         let new_root = set.root()?;
 
         // Set hamt node to set new root
-        self.0.set(u64_key(key as u64), new_root)?;
+        self.0.set::<_>(u64_key(key as u64), new_root, hash_algo)?;
         Ok(())
     }
 
     /// Puts slice of DealIDs in the hash set of the key.
-    pub fn put_many(&mut self, key: ChainEpoch, values: &[DealID]) -> Result<(), Error> {
+    pub fn put_many<HA>(
+        &mut self,
+        key: ChainEpoch,
+        values: &[DealID],
+        hash_algo: &mut HA,
+    ) -> Result<(), Error>
+    where
+        HA: HashAlgorithm,
+    {
         // Get construct amt from retrieved cid or create new
-        let mut set = self.get(key)?.unwrap_or_else(|| Set::new(self.0.store()));
+        let mut set = self.get::<_>(key, hash_algo)?.unwrap_or_else(|| Set::new(self.0.store()));
 
         for &v in values {
-            set.put(u64_key(v))?;
+            set.put::<_>(u64_key(v), hash_algo)?;
         }
 
         // Save and calculate new root
         let new_root = set.root()?;
 
         // Set hamt node to set new root
-        self.0.set(u64_key(key as u64), new_root)?;
+        self.0.set::<_>(u64_key(key as u64), new_root, hash_algo)?;
         Ok(())
     }
 
     /// Gets the set at the given index of the `SetMultimap`
     #[inline]
-    pub fn get(&self, key: ChainEpoch) -> Result<Option<Set<'a, BS>>, Error> {
-        match self.0.get(&u64_key(key as u64))? {
+    pub fn get<HA>(&self, key: ChainEpoch, hash_algo: &mut HA) -> Result<Option<Set<'a, BS>>, Error>
+    where
+        HA: HashAlgorithm,
+    {
+        match self.0.get::<_, _>(&u64_key(key as u64), hash_algo)? {
             Some(cid) => Ok(Some(Set::from_root(*self.0.store(), cid)?)),
             None => Ok(None),
         }
@@ -80,37 +99,54 @@ where
 
     /// Removes a DealID from a key hash set.
     #[inline]
-    pub fn remove(&mut self, key: ChainEpoch, v: DealID) -> Result<(), Error> {
+    pub fn remove<HA>(
+        &mut self,
+        key: ChainEpoch,
+        v: DealID,
+        hash_algo: &mut HA,
+    ) -> Result<(), Error>
+    where
+        HA: HashAlgorithm,
+    {
         // Get construct amt from retrieved cid and return if no set exists
-        let mut set = match self.get(key)? {
+        let mut set = match self.get::<_>(key, hash_algo)? {
             Some(s) => s,
             None => return Ok(()),
         };
 
-        set.delete(u64_key(v).borrow())?;
+        set.delete::<_>(u64_key(v).borrow(), hash_algo)?;
 
         // Save and calculate new root
         let new_root = set.root()?;
-        self.0.set(u64_key(key as u64), new_root)?;
+        self.0.set::<_>(u64_key(key as u64), new_root, hash_algo)?;
         Ok(())
     }
 
     /// Removes set at index.
     #[inline]
-    pub fn remove_all(&mut self, key: ChainEpoch) -> Result<(), Error> {
+    pub fn remove_all<HA>(&mut self, key: ChainEpoch, hash_algo: &mut HA) -> Result<(), Error>
+    where
+        HA: HashAlgorithm,
+    {
         // Remove entry from table
-        self.0.delete(&u64_key(key as u64))?;
+        self.0.delete::<_, _>(&u64_key(key as u64), hash_algo)?;
 
         Ok(())
     }
 
     /// Iterates through keys and converts them to a DealID to call a function on each.
-    pub fn for_each<F>(&self, key: ChainEpoch, mut f: F) -> Result<(), Error>
+    pub fn for_each<F, HA>(
+        &self,
+        key: ChainEpoch,
+        mut f: F,
+        hash_algo: &mut HA,
+    ) -> Result<(), Error>
     where
         F: FnMut(DealID) -> Result<(), Error>,
+        HA: HashAlgorithm,
     {
         // Get construct amt from retrieved cid and return if no set exists
-        let set = match self.get(key)? {
+        let set = match self.get::<_>(key, hash_algo)? {
             Some(s) => s,
             None => return Ok(()),
         };
