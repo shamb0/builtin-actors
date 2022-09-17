@@ -53,8 +53,6 @@ pub struct FvmRuntime<B = ActorBlockstore> {
     caller_validated: bool,
     /// The runtime policy
     policy: Policy,
-    /// Runtime buffer for hash processing
-    hash_proc_buff: Vec<u8>,
 }
 
 impl Default for FvmRuntime {
@@ -64,7 +62,6 @@ impl Default for FvmRuntime {
             in_transaction: false,
             caller_validated: false,
             policy: Policy::default(),
-            hash_proc_buff: vec![],
         }
     }
 }
@@ -620,30 +617,14 @@ impl<B> FvmRuntime<B>
 where
     B: Blockstore,
 {
-    pub fn finalize(&mut self) -> HashedKey {
+    pub fn finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
         let mut rval: HashedKey = Default::default();
 
         rval.copy_from_slice(
-            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, &self.hash_proc_buff),
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
         );
 
-        self.hash_proc_buff = vec![];
-
         rval
-    }
-}
-
-impl<B> Hasher for FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn finish(&self) -> u64 {
-        // u64 hash not used in hamt
-        0
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        self.hash_proc_buff.extend_from_slice(bytes);
     }
 }
 
@@ -651,8 +632,24 @@ impl<B> HashAlgorithm for FvmRuntime<B>
 where
     B: Blockstore,
 {
-    fn rt_hash(&mut self, key: &dyn Hash) -> HashedKey {
-        key.hash(self);
-        self.finalize()
+    fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
+		let mut hasher = FvmRuntimeHasherWrapper::default();
+        key.hash(&mut hasher);
+        self.finalize(&hasher.0)
+    }
+}
+
+#[derive(Default)]
+struct FvmRuntimeHasherWrapper(Vec<u8>);
+
+impl Hasher for FvmRuntimeHasherWrapper
+{
+    fn finish(&self) -> u64 {
+        // u64 hash not used in hamt
+        0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.0.extend_from_slice(bytes);
     }
 }

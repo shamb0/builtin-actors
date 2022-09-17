@@ -43,7 +43,7 @@ where
         &mut self,
         key: ChainEpoch,
         value: DealID,
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error> {
         // Get construct amt from retrieved cid or create new
         let mut set = self.get(key, hash_algo)?.unwrap_or_else(|| Set::new(self.0.store()));
@@ -63,7 +63,7 @@ where
         &mut self,
         key: ChainEpoch,
         values: &[DealID],
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error> {
         // Get construct amt from retrieved cid or create new
         let mut set = self.get(key, hash_algo)?.unwrap_or_else(|| Set::new(self.0.store()));
@@ -85,7 +85,7 @@ where
     pub fn get(
         &self,
         key: ChainEpoch,
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<Option<Set<'a, BS>>, Error> {
         match self.0.get(&u64_key(key as u64), hash_algo)? {
             Some(cid) => Ok(Some(Set::from_root(*self.0.store(), cid)?)),
@@ -99,7 +99,7 @@ where
         &mut self,
         key: ChainEpoch,
         v: DealID,
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error> {
         // Get construct amt from retrieved cid and return if no set exists
         let mut set = match self.get(key, hash_algo)? {
@@ -120,7 +120,7 @@ where
     pub fn remove_all(
         &mut self,
         key: ChainEpoch,
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error> {
         // Remove entry from table
         self.0.delete(&u64_key(key as u64), hash_algo)?;
@@ -133,7 +133,7 @@ where
         &self,
         key: ChainEpoch,
         mut f: F,
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error>
     where
         F: FnMut(DealID) -> Result<(), Error>,

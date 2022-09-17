@@ -290,7 +290,7 @@ impl State {
         &mut self,
         store: &BS,
         precommits: Vec<SectorPreCommitOnChainInfo>,
-		hash_algo: &mut dyn HashAlgorithm,
+		hash_algo: & dyn HashAlgorithm,
     ) -> anyhow::Result<()> {
         let mut precommitted =
             make_map_with_root_and_bitwidth(&self.pre_committed_sectors, store, HAMT_BIT_WIDTH)?;
@@ -314,7 +314,7 @@ impl State {
         &self,
         store: &BS,
         sector_num: SectorNumber,
-		hash_algo: &mut dyn HashAlgorithm,
+		hash_algo: & dyn HashAlgorithm,
     ) -> Result<Option<SectorPreCommitOnChainInfo>, HamtError> {
         let precommitted =
             make_map_with_root_and_bitwidth(&self.pre_committed_sectors, store, HAMT_BIT_WIDTH)?;
@@ -326,7 +326,7 @@ impl State {
         &self,
         store: &BS,
         sector_numbers: &[SectorNumber],
-		hash_algo: &mut dyn HashAlgorithm,
+		hash_algo: & dyn HashAlgorithm,
     ) -> anyhow::Result<Vec<SectorPreCommitOnChainInfo>> {
         let precommitted = make_map_with_root_and_bitwidth::<_, SectorPreCommitOnChainInfo>(
             &self.pre_committed_sectors,
@@ -353,7 +353,7 @@ impl State {
         &mut self,
         store: &BS,
         sector_nums: &[SectorNumber],
-		hash_algo: &mut dyn HashAlgorithm,
+		hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), HamtError> {
         let mut precommitted = make_map_with_root_and_bitwidth::<_, SectorPreCommitOnChainInfo>(
             &self.pre_committed_sectors,
@@ -1041,7 +1041,7 @@ impl State {
         policy: &Policy,
         store: &BS,
         current_epoch: ChainEpoch,
-		hash_algo: &mut dyn HashAlgorithm,
+		hash_algo: & dyn HashAlgorithm,
     ) -> anyhow::Result<TokenAmount> {
         let mut deposit_to_burn = TokenAmount::zero();
 
@@ -1180,7 +1180,7 @@ impl State {
         &self,
         store: &BS,
         sector_nos: &BitField,
-		hash_algo: &mut dyn HashAlgorithm,
+		hash_algo: & dyn HashAlgorithm,
     ) -> anyhow::Result<Vec<SectorPreCommitOnChainInfo>> {
         let mut precommits = Vec::new();
         let precommitted =

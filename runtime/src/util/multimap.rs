@@ -45,7 +45,7 @@ where
         &mut self,
         key: BytesKey,
         value: V,
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error>
     where
         V: Serialize + DeserializeOwned,
@@ -71,7 +71,7 @@ where
     pub fn get<V>(
         &self,
         key: &[u8],
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<Option<Array<'a, V, BS>>, Error>
     where
         V: DeserializeOwned + Serialize,
@@ -89,7 +89,7 @@ where
     pub fn remove_all(
         &mut self,
         key: &[u8],
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error> {
         // Remove entry from table
         self.0.delete(key, hash_algo)?.ok_or("failed to delete from multimap")?;
@@ -102,7 +102,7 @@ where
         &self,
         key: &[u8],
         f: F,
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error>
     where
         V: Serialize + DeserializeOwned,

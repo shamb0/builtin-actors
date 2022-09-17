@@ -232,7 +232,7 @@ impl Actor {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load cron events")
             })?;
 
-            st.append_cron_event(&mut events, params.event_epoch, miner_event).map_err(|e| {
+            st.append_cron_event(&mut events, params.event_epoch, miner_event, rt).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to enroll cron event")
             })?;
 
@@ -296,7 +296,7 @@ impl Actor {
     {
         rt.validate_immediate_caller_type(std::iter::once(&Type::Miner))?;
         rt.transaction(|st: &mut State, rt| {
-            st.validate_miner_has_claim(rt.store(), &rt.message().caller())?;
+            st.validate_miner_has_claim(rt.store(), &rt.message().caller(), rt)?;
             st.add_pledge_total(pledge_delta);
             if st.total_pledge_collateral.is_negative() {
                 return Err(actor_error!(
@@ -558,7 +558,7 @@ impl Actor {
                         e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load claims")
                     })?;
             for epoch in st.first_cron_epoch..=rt_epoch {
-                let epoch_events = load_cron_events(&events, epoch).map_err(|e| {
+                let epoch_events = load_cron_events(&events, epoch, rt).map_err(|e| {
                     e.downcast_default(
                         ExitCode::USR_ILLEGAL_STATE,
                         format!("failed to load cron events at {}", epoch),
@@ -633,7 +633,7 @@ impl Actor {
 
                 // Remove power and leave miner frozen
                 for miner_addr in failed_miner_crons {
-                    if let Err(e) = st.delete_claim(rt.policy(), &mut claims, &miner_addr) {
+                    if let Err(e) = st.delete_claim(rt.policy(), &mut claims, &miner_addr, rt) {
                         error!(
                             "failed to delete claim for miner {} after\
                             failing on deferred cron event: {}",

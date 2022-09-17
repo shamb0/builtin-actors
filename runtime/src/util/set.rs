@@ -46,7 +46,7 @@ where
 
     /// Adds key to the set.
     #[inline]
-    pub fn put(&mut self, key: BytesKey, hash_algo: &mut dyn HashAlgorithm) -> Result<(), Error> {
+    pub fn put(&mut self, key: BytesKey, hash_algo: & dyn HashAlgorithm) -> Result<(), Error> {
         // Set hamt node to array root
         self.0.set(key, (), hash_algo)?;
         Ok(())
@@ -54,7 +54,7 @@ where
 
     /// Checks if key exists in the set.
     #[inline]
-    pub fn has(&self, key: &[u8], hash_algo: &mut dyn HashAlgorithm) -> Result<bool, Error> {
+    pub fn has(&self, key: &[u8], hash_algo: & dyn HashAlgorithm) -> Result<bool, Error> {
         self.0.contains_key(key, hash_algo)
     }
 
@@ -63,7 +63,7 @@ where
     pub fn delete(
         &mut self,
         key: &[u8],
-        hash_algo: &mut dyn HashAlgorithm,
+        hash_algo: & dyn HashAlgorithm,
     ) -> Result<Option<()>, Error> {
         match self.0.delete(key, hash_algo)? {
             Some(_) => Ok(Some(())),

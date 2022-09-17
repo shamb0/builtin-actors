@@ -150,9 +150,6 @@ pub struct MockRuntime {
     pub policy: Policy,
 
     pub circulating_supply: TokenAmount,
-
-    /// Runtime buffer for hash processing
-    hash_proc_buff: Vec<u8>,
 }
 
 #[derive(Default)]
@@ -291,7 +288,6 @@ impl Default for MockRuntime {
             expectations: Default::default(),
             policy: Default::default(),
             circulating_supply: Default::default(),
-            hash_proc_buff: vec![],
         }
     }
 }
@@ -1349,33 +1345,34 @@ pub fn new_bls_addr(s: u8) -> Address {
 }
 
 impl MockRuntime {
-    pub fn finalize(&mut self) -> HashedKey {
+    pub fn finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
         let mut rval: HashedKey = Default::default();
 
         rval.copy_from_slice(
-            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, &self.hash_proc_buff),
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
         );
-
-        self.hash_proc_buff = vec![];
 
         rval
     }
 }
 
-impl Hasher for MockRuntime {
+impl HashAlgorithm for MockRuntime {
+    fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
+		let mut hasher = MockRuntimeHasherWrapper::default();
+        key.hash(&mut hasher);
+        self.finalize(&hasher.0)
+    }
+}
+
+#[derive(Default)]
+struct MockRuntimeHasherWrapper(Vec<u8>);
+impl Hasher for MockRuntimeHasherWrapper {
     fn finish(&self) -> u64 {
         // u64 hash not used in hamt
         0
     }
 
     fn write(&mut self, bytes: &[u8]) {
-        self.hash_proc_buff.extend_from_slice(bytes);
-    }
-}
-
-impl HashAlgorithm for MockRuntime {
-    fn rt_hash(&mut self, key: &dyn Hash) -> HashedKey {
-        key.hash(self);
-        self.finalize()
+        self.0.extend_from_slice(bytes);
     }
 }
