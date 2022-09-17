@@ -25,6 +25,8 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::ExitCode;
 use fvm_shared::sector::{RegisteredPoStProof, SectorNumber, SectorSize, MAX_SECTOR_NUMBER};
 use fvm_shared::HAMT_BIT_WIDTH;
+use fvm_shared::runtime::traits::HashAlgorithm;
+
 use num_traits::Zero;
 
 use super::deadlines::new_deadline_info;
@@ -288,13 +290,14 @@ impl State {
         &mut self,
         store: &BS,
         precommits: Vec<SectorPreCommitOnChainInfo>,
+		hash_algo: &mut dyn HashAlgorithm,
     ) -> anyhow::Result<()> {
         let mut precommitted =
             make_map_with_root_and_bitwidth(&self.pre_committed_sectors, store, HAMT_BIT_WIDTH)?;
         for precommit in precommits.into_iter() {
             let sector_no = precommit.info.sector_number;
             let modified = precommitted
-                .set_if_absent(u64_key(precommit.info.sector_number), precommit)
+                .set_if_absent(u64_key(precommit.info.sector_number), precommit, hash_algo)
                 .map_err(|e| {
                     e.downcast_wrap(format!("failed to store precommitment for {:?}", sector_no,))
                 })?;
@@ -311,10 +314,11 @@ impl State {
         &self,
         store: &BS,
         sector_num: SectorNumber,
+		hash_algo: &mut dyn HashAlgorithm,
     ) -> Result<Option<SectorPreCommitOnChainInfo>, HamtError> {
         let precommitted =
             make_map_with_root_and_bitwidth(&self.pre_committed_sectors, store, HAMT_BIT_WIDTH)?;
-        Ok(precommitted.get(&u64_key(sector_num))?.cloned())
+        Ok(precommitted.get(&u64_key(sector_num), hash_algo)?.cloned())
     }
 
     /// Gets and returns the requested pre-committed sectors, skipping missing sectors.
@@ -322,6 +326,7 @@ impl State {
         &self,
         store: &BS,
         sector_numbers: &[SectorNumber],
+		hash_algo: &mut dyn HashAlgorithm,
     ) -> anyhow::Result<Vec<SectorPreCommitOnChainInfo>> {
         let precommitted = make_map_with_root_and_bitwidth::<_, SectorPreCommitOnChainInfo>(
             &self.pre_committed_sectors,
@@ -331,7 +336,7 @@ impl State {
         let mut result = Vec::with_capacity(sector_numbers.len());
 
         for &sector_number in sector_numbers {
-            let info = match precommitted.get(&u64_key(sector_number)).map_err(|e| {
+            let info = match precommitted.get(&u64_key(sector_number), hash_algo).map_err(|e| {
                 e.downcast_wrap(format!("failed to load precommitment for {}", sector_number))
             })? {
                 Some(info) => info.clone(),
@@ -348,6 +353,7 @@ impl State {
         &mut self,
         store: &BS,
         sector_nums: &[SectorNumber],
+		hash_algo: &mut dyn HashAlgorithm,
     ) -> Result<(), HamtError> {
         let mut precommitted = make_map_with_root_and_bitwidth::<_, SectorPreCommitOnChainInfo>(
             &self.pre_committed_sectors,
@@ -356,7 +362,7 @@ impl State {
         )?;
 
         for &sector_num in sector_nums {
-            let prev_entry = precommitted.delete(&u64_key(sector_num))?;
+            let prev_entry = precommitted.delete(&u64_key(sector_num), hash_algo)?;
             if prev_entry.is_none() {
                 return Err(format!("sector {} doesn't exist", sector_num).into());
             }
@@ -1035,6 +1041,7 @@ impl State {
         policy: &Policy,
         store: &BS,
         current_epoch: ChainEpoch,
+		hash_algo: &mut dyn HashAlgorithm,
     ) -> anyhow::Result<TokenAmount> {
         let mut deposit_to_burn = TokenAmount::zero();
 
@@ -1056,7 +1063,7 @@ impl State {
         for i in sectors.iter() {
             let sector_number = i as SectorNumber;
 
-            let sector = match self.get_precommitted_sector(store, sector_number)? {
+            let sector = match self.get_precommitted_sector(store, sector_number, hash_algo)? {
                 Some(sector) => sector,
                 // already committed/deleted
                 None => continue,
@@ -1071,7 +1078,7 @@ impl State {
 
         // Actually delete it.
         if !precommits_to_delete.is_empty() {
-            self.delete_precommitted_sectors(store, &precommits_to_delete)?;
+            self.delete_precommitted_sectors(store, &precommits_to_delete, hash_algo)?;
         }
 
         self.pre_commit_deposits -= &deposit_to_burn;
@@ -1173,6 +1180,7 @@ impl State {
         &self,
         store: &BS,
         sector_nos: &BitField,
+		hash_algo: &mut dyn HashAlgorithm,
     ) -> anyhow::Result<Vec<SectorPreCommitOnChainInfo>> {
         let mut precommits = Vec::new();
         let precommitted =
@@ -1185,7 +1193,7 @@ impl State {
             }
             let info: &SectorPreCommitOnChainInfo =
                 precommitted
-                    .get(&u64_key(sector_no as u64))?
+                    .get(&u64_key(sector_no as u64), hash_algo)?
                     .ok_or_else(|| actor_error!(not_found, "sector {} not found", sector_no))?;
             precommits.push(info.clone());
         }

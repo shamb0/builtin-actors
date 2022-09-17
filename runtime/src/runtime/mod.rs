@@ -14,6 +14,7 @@ use fvm_shared::crypto::signature::{
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::piece::PieceInfo;
 use fvm_shared::randomness::Randomness;
+use fvm_shared::runtime::traits::HashAlgorithm;
 use fvm_shared::sector::{
     AggregateSealVerifyProofAndInfos, RegisteredSealProof, ReplicaUpdateInfo, SealVerifyInfo,
     WindowPoStVerifyInfo,
@@ -39,7 +40,7 @@ pub mod fvm;
 
 /// Runtime is the VM's internal runtime object.
 /// this is everything that is accessible to actors, beyond parameters.
-pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy {
+pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy + HashAlgorithm {
     /// The network protocol version number at the current epoch.
     fn network_version(&self) -> NetworkVersion;
 

@@ -1,6 +1,8 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::hash::Hasher;
+
 use core::fmt;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -25,6 +27,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::ExitCode;
 use fvm_shared::piece::PieceInfo;
 use fvm_shared::randomness::Randomness;
+use fvm_shared::runtime::traits::{Hash, HashAlgorithm, HashedKey};
 use fvm_shared::sector::{
     AggregateSealVerifyInfo, AggregateSealVerifyProofAndInfos, RegisteredSealProof,
     ReplicaUpdateInfo, SealVerifyInfo, WindowPoStVerifyInfo,
@@ -147,6 +150,9 @@ pub struct MockRuntime {
     pub policy: Policy,
 
     pub circulating_supply: TokenAmount,
+
+    /// Runtime buffer for hash processing
+    hash_proc_buff: Vec<u8>,
 }
 
 #[derive(Default)]
@@ -285,6 +291,7 @@ impl Default for MockRuntime {
             expectations: Default::default(),
             policy: Default::default(),
             circulating_supply: Default::default(),
+            hash_proc_buff: vec![],
         }
     }
 }
@@ -1339,4 +1346,36 @@ pub fn new_bls_addr(s: u8) -> Address {
     let mut key = [0u8; 48];
     rng.fill_bytes(&mut key);
     Address::new_bls(&key).unwrap()
+}
+
+impl MockRuntime {
+    pub fn finalize(&mut self) -> HashedKey {
+        let mut rval: HashedKey = Default::default();
+
+        rval.copy_from_slice(
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, &self.hash_proc_buff),
+        );
+
+        self.hash_proc_buff = vec![];
+
+        rval
+    }
+}
+
+impl Hasher for MockRuntime {
+    fn finish(&self) -> u64 {
+        // u64 hash not used in hamt
+        0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.hash_proc_buff.extend_from_slice(bytes);
+    }
+}
+
+impl HashAlgorithm for MockRuntime {
+    fn rt_hash(&mut self, key: &dyn Hash) -> HashedKey {
+        key.hash(self);
+        self.finalize()
+    }
 }
