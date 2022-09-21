@@ -20,8 +20,8 @@ where
     /// Initializes a new empty multimap.
     /// The outer_bitwidth is the width of the HAMT and the
     /// inner_bitwidth is the width of the AMTs inside of it.
-    pub fn new(bs: &'a BS, outer_bitwidth: u32, inner_bitwidth: u32) -> Self {
-        Self(make_empty_map(bs, outer_bitwidth), inner_bitwidth)
+    pub fn new(bs: &'a BS, outer_bitwidth: u32, inner_bitwidth: u32, hash_algo: Box<dyn HashAlgorithm>) -> Self {
+        Self(make_empty_map(bs, outer_bitwidth, hash_algo), inner_bitwidth)
     }
 
     /// Initializes a multimap from a root Cid
@@ -30,8 +30,9 @@ where
         cid: &Cid,
         outer_bitwidth: u32,
         inner_bitwidth: u32,
+		hash_algo: Box<dyn HashAlgorithm>,
     ) -> Result<Self, Error> {
-        Ok(Self(make_map_with_root_and_bitwidth(cid, bs, outer_bitwidth)?, inner_bitwidth))
+        Ok(Self(make_map_with_root_and_bitwidth(cid, bs, outer_bitwidth, hash_algo)?, inner_bitwidth))
     }
 
     /// Retrieve root from the multimap.
@@ -45,14 +46,13 @@ where
         &mut self,
         key: BytesKey,
         value: V,
-        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error>
     where
         V: Serialize + DeserializeOwned,
     {
         // Get construct amt from retrieved cid or create new
         let mut arr = self
-            .get::<V>(&key, hash_algo)?
+            .get::<V>(&key)?
             .unwrap_or_else(|| Array::new_with_bit_width(self.0.store(), self.1));
 
         // Set value at next index
@@ -62,7 +62,7 @@ where
         let new_root = arr.flush().map_err(|e| anyhow::anyhow!(e))?;
 
         // Set hamt node to array root
-        self.0.set(key, new_root, hash_algo)?;
+        self.0.set(key, new_root)?;
         Ok(())
     }
 
@@ -71,12 +71,11 @@ where
     pub fn get<V>(
         &self,
         key: &[u8],
-        hash_algo: & dyn HashAlgorithm,
     ) -> Result<Option<Array<'a, V, BS>>, Error>
     where
         V: DeserializeOwned + Serialize,
     {
-        match self.0.get(key, hash_algo)? {
+        match self.0.get(key)? {
             Some(cid) => {
                 Ok(Some(Array::load(cid, *self.0.store()).map_err(|e| anyhow::anyhow!(e))?))
             }
@@ -89,10 +88,9 @@ where
     pub fn remove_all(
         &mut self,
         key: &[u8],
-        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error> {
         // Remove entry from table
-        self.0.delete(key, hash_algo)?.ok_or("failed to delete from multimap")?;
+        self.0.delete(key)?.ok_or("failed to delete from multimap")?;
 
         Ok(())
     }
@@ -102,13 +100,12 @@ where
         &self,
         key: &[u8],
         f: F,
-        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error>
     where
         V: Serialize + DeserializeOwned,
         F: FnMut(u64, &V) -> anyhow::Result<()>,
     {
-        if let Some(amt) = self.get::<V>(key, hash_algo)? {
+        if let Some(amt) = self.get::<V>(key)? {
             amt.for_each(f).map_err(|e| anyhow::anyhow!(e))?;
         }
 

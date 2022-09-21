@@ -1629,6 +1629,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "lazy_static",
  "libipld-core",
  "multihash",
  "once_cell",

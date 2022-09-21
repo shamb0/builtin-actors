@@ -2,19 +2,22 @@ pub mod interpreter;
 mod state;
 
 use {
+	std::borrow::Borrow,
+	std::sync::Arc,
     crate::interpreter::{execute, Bytecode, ExecutionState, StatusCode, System, U256},
     crate::state::State,
     bytes::Bytes,
     cid::Cid,
     fil_actors_runtime::{
         cbor,
-        runtime::{ActorCode, Runtime},
+        runtime::{ActorCode, Runtime, hash_algorithm::RuntimeHashAlgoWrap},
         ActorDowncast, ActorError,
     },
     fvm_ipld_blockstore::Blockstore,
     fvm_ipld_encoding::tuple::*,
     fvm_ipld_encoding::RawBytes,
-    fvm_ipld_hamt::Hamt,
+    fvm_ipld_hamt::{Hamt, DEFAULT_BIT_WIDTH},
+	fvm_shared::runtime::traits::HashAlgorithm,
     fvm_shared::error::*,
     fvm_shared::{MethodNum, METHOD_CONSTRUCTOR},
     num_derive::FromPrimitive,
@@ -41,12 +44,12 @@ pub enum Method {
 
 pub struct EvmContractActor;
 impl EvmContractActor {
-    pub fn constructor<BS, RT>(rt: &mut RT, params: ConstructorParams) -> Result<(), ActorError>
+    pub fn constructor<BS, RT>(rt: mut Arc<Box<RT>>, params: ConstructorParams) -> Result<(), ActorError>
     where
         BS: Blockstore + Clone,
         RT: Runtime<BS>,
     {
-        rt.validate_immediate_caller_accept_any()?;
+        Arc::get_mut_unchecked(&rt).validate_immediate_caller_accept_any()?;
 
         if params.bytecode.len() > MAX_CODE_SIZE {
             return Err(ActorError::illegal_argument(format!(
@@ -59,11 +62,19 @@ impl EvmContractActor {
             return Err(ActorError::illegal_argument("no bytecode provided".into()));
         }
 
+		let hash_algo: Box<dyn HashAlgorithm> = Box::new(
+			RuntimeHashAlgoWrap::from_rt(rt.as_ref())
+		);
+
         // create an empty storage HAMT to pass it down for execution.
-        let mut hamt = Hamt::<_, U256, U256>::new(rt.store().clone());
+        let mut hamt = Hamt::<_, U256, U256>::new_with_bit_width(
+			Arc::get_mut_unchecked(&rt).store().clone(),
+			DEFAULT_BIT_WIDTH,
+			hash_algo
+		);
 
         // create an instance of the platform abstraction layer -- note: do we even need this?
-        let mut system = System::new(rt, &mut hamt).map_err(|e| {
+        let mut system = System::new(rt.as_ref(), &mut hamt).map_err(|e| {
             ActorError::unspecified(format!("failed to create execution abstraction layer: {e:?}"))
         })?;
 
@@ -99,14 +110,14 @@ impl EvmContractActor {
             let contract_state_cid = system.flush_state()?;
 
             let state = State::new(
-                rt.store(),
+                Arc::get_mut_unchecked(&rt).store(),
                 RawBytes::new(contract_bytecode.to_vec()),
                 contract_state_cid,
             )
             .map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to construct state")
             })?;
-            rt.create(&state)?;
+            Arc::get_mut_unchecked(&rt).create(&state)?;
 
             Ok(())
         } else if let StatusCode::ActorError(e) = exec_status.status_code {
@@ -117,7 +128,7 @@ impl EvmContractActor {
     }
 
     pub fn invoke_contract<BS, RT>(
-        rt: &mut RT,
+        rt: Arc<Box<RT>>,
         method: u64,
         input_data: &RawBytes,
     ) -> Result<RawBytes, ActorError>
@@ -125,11 +136,12 @@ impl EvmContractActor {
         BS: Blockstore + Clone,
         RT: Runtime<BS>,
     {
-        rt.validate_immediate_caller_accept_any()?;
+        Arc::get_mut_unchecked(&rt).validate_immediate_caller_accept_any()?;
 
-        let state: State = rt.state()?;
+        let state: State = Arc::get_mut_unchecked(&rt).state()?;
         let bytecode: Vec<u8> = rt
-            .store()
+			.get_mut()
+			.store()
             .get(&state.bytecode)
             .map_err(|e| ActorError::unspecified(format!("failed to load bytecode: {e:?}")))?
             .ok_or_else(|| ActorError::unspecified("missing bytecode".to_string()))?;
@@ -137,14 +149,18 @@ impl EvmContractActor {
         let bytecode = Bytecode::new(&bytecode);
 
         // clone the blockstore here to pass to the System, this is bound to the HAMT.
-        let blockstore = rt.store().clone();
+        let blockstore = Arc::get_mut_unchecked(&rt).store().clone();
+
+		let hash_algo: Box<dyn HashAlgorithm> = Box::new(
+			RuntimeHashAlgoWrap::from_rt(rt.as_ref())
+		);
 
         // load the storage HAMT
-        let mut hamt = Hamt::load(&state.contract_state, blockstore).map_err(|e| {
+        let mut hamt = Hamt::load(&state.contract_state, blockstore, hash_algo).map_err(|e| {
             ActorError::illegal_state(format!("failed to load storage HAMT on invoke: {e:?}, e"))
         })?;
 
-        let mut system = System::new(rt, &mut hamt).map_err(|e| {
+        let mut system = System::new(rt.as_ref(), &mut hamt).map_err(|e| {
             ActorError::unspecified(format!("failed to create execution abstraction layer: {e:?}"))
         })?;
 
@@ -166,7 +182,7 @@ impl EvmContractActor {
             // this needs to be outside the transaction or else rustc has a fit about
             // mutably borrowing the runtime twice.... sigh.
             let contract_state = system.flush_state()?;
-            rt.transaction(|state: &mut State, _rt| {
+            Arc::get_mut_unchecked(&rt).transaction(|state: &mut State, _rt| {
                 state.contract_state = contract_state;
                 Ok(())
             })?;
@@ -180,14 +196,14 @@ impl EvmContractActor {
         }
 
         if let Some(addr) = exec_status.selfdestroyed {
-            rt.delete_actor(&addr)?
+            Arc::get_mut_unchecked(&rt).delete_actor(&addr)?
         }
 
         let output = RawBytes::from(exec_status.output_data.to_vec());
         Ok(output)
     }
 
-    pub fn bytecode<BS, RT>(rt: &mut RT) -> Result<Cid, ActorError>
+    pub fn bytecode<BS, RT>(rt: Arc<Box<RT>>) -> Result<Cid, ActorError>
     where
         BS: Blockstore + Clone,
         RT: Runtime<BS>,
@@ -199,7 +215,7 @@ impl EvmContractActor {
         Ok(state.bytecode)
     }
 
-    pub fn storage_at<BS, RT>(rt: &mut RT, params: GetStorageAtParams) -> Result<U256, ActorError>
+    pub fn storage_at<BS, RT>(rt: Arc<Box<RT>>, params: GetStorageAtParams) -> Result<U256, ActorError>
     where
         BS: Blockstore + Clone,
         RT: Runtime<BS>,
@@ -211,9 +227,13 @@ impl EvmContractActor {
         let state: State = rt.state()?;
         let blockstore = rt.store().clone();
 
+		let hash_algo: Box<dyn HashAlgorithm> = Box::new(
+			RuntimeHashAlgoWrap::from_rt(rt)
+		);
+
         // load the storage HAMT
         let mut hamt =
-            Hamt::<_, _, U256>::load(&state.contract_state, blockstore).map_err(|e| {
+            Hamt::<_, _, U256>::load(&state.contract_state, blockstore, hash_algo).map_err(|e| {
                 ActorError::illegal_state(format!(
                     "failed to load storage HAMT on invoke: {e:?}, e"
                 ))
@@ -232,7 +252,7 @@ impl EvmContractActor {
 
 impl ActorCode for EvmContractActor {
     fn invoke_method<BS, RT>(
-        rt: &mut RT,
+        rt: Arc<Box<RT>>,
         method: MethodNum,
         params: &RawBytes,
     ) -> Result<RawBytes, ActorError>

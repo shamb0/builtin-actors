@@ -1,4 +1,3 @@
-use std::hash::Hasher;
 
 use anyhow::{anyhow, Error};
 use cid::multihash::{Code, MultihashDigest};
@@ -23,6 +22,7 @@ use fvm_shared::sector::{
 };
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{ActorID, MethodNum};
+use fvm_ipld_hamt::{GLOBAL_DEFAULT_SHA256_ALGO};
 use num_traits::FromPrimitive;
 #[cfg(feature = "fake-proofs")]
 use sha2::{Digest, Sha256};
@@ -33,7 +33,7 @@ use crate::runtime::{
     ActorCode, ConsensusFault, DomainSeparationTag, MessageInfo, Policy, Primitives, RuntimePolicy,
     Verifier,
 };
-use crate::{actor_error, ActorError, Runtime};
+use crate::{actor_error, ActorError, Runtime, hash_algorithm::RuntimeHashAlgoWrap};
 
 lazy_static! {
     /// Cid of the empty array Cbor bytes (`EMPTY_ARR_BYTES`).
@@ -44,6 +44,7 @@ lazy_static! {
 }
 
 /// A runtime that bridges to the FVM environment through the FVM SDK.
+#[derive(Clone)]
 pub struct FvmRuntime<B = ActorBlockstore> {
     blockstore: B,
     /// Indicates whether we are in a state transaction. During such, sending
@@ -444,6 +445,17 @@ where
         fvm::crypto::recover_secp_public_key(hash, signature)
             .map_err(|e| anyhow!("failed to recover pubkey; exit code: {}", e))
     }
+
+    fn hash_finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
+        let mut rval: HashedKey = Default::default();
+
+        rval.copy_from_slice(
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
+        );
+
+        rval
+    }
+
 }
 
 #[cfg(not(feature = "fake-proofs"))]
@@ -594,6 +606,7 @@ pub fn trampoline<C: ActorCode>(params: u32) -> u32 {
 
     // Construct a new runtime.
     let mut rt = FvmRuntime::default();
+
     // Invoke the method, aborting if the actor returns an errored exit code.
     let ret = C::invoke_method(&mut rt, method, &params)
         .unwrap_or_else(|err| fvm::vm::abort(err.exit_code().value(), Some(err.msg())));
@@ -613,43 +626,42 @@ pub fn trampoline<C: ActorCode>(params: u32) -> u32 {
     }
 }
 
-impl<B> FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    pub fn finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
-        let mut rval: HashedKey = Default::default();
 
-        rval.copy_from_slice(
-            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
-        );
+// impl<B> Into<Box<dyn HashAlgorithm>> for FvmRuntime<B>
+// where
+//     B: Blockstore,
+// {
+// 	fn into(&self) -> Box<dyn HashAlgorithm> {
+// 		Box::new(self)
+// 	}
+// }
 
-        rval
-    }
-}
+// impl<B> FvmRuntime<B>
+// where
+//     B: Blockstore,
+// {
+//     pub fn finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
+//         let mut rval: HashedKey = Default::default();
 
-impl<B> HashAlgorithm for FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
-		let mut hasher = FvmRuntimeHasherWrapper::default();
-        key.hash(&mut hasher);
-        self.finalize(&hasher.0)
-    }
-}
+//         rval.copy_from_slice(
+//             &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
+//         );
 
-#[derive(Default)]
-struct FvmRuntimeHasherWrapper(Vec<u8>);
+//         rval
+//     }
+// }
 
-impl Hasher for FvmRuntimeHasherWrapper
-{
-    fn finish(&self) -> u64 {
-        // u64 hash not used in hamt
-        0
-    }
+// impl<B> HashAlgorithm for FvmRuntime<B>
+// where
+//     B: Blockstore,
+// {
+//     fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
+// 		let mut hasher = FvmRuntimeHasherWrapper::default();
+//         key.hash(&mut hasher);
+//         self.finalize(&hasher.0)
+//     }
 
-    fn write(&mut self, bytes: &[u8]) {
-        self.0.extend_from_slice(bytes);
-    }
-}
+// 	fn rt_hash_get_ref(&self) -> Box<dyn HashAlgorithm> {
+// 		Box::new(self)
+// 	}
+// }

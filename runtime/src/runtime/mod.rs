@@ -14,7 +14,7 @@ use fvm_shared::crypto::signature::{
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::piece::PieceInfo;
 use fvm_shared::randomness::Randomness;
-use fvm_shared::runtime::traits::HashAlgorithm;
+use fvm_shared::runtime::traits::{HashedKey};
 use fvm_shared::sector::{
     AggregateSealVerifyProofAndInfos, RegisteredSealProof, ReplicaUpdateInfo, SealVerifyInfo,
     WindowPoStVerifyInfo,
@@ -38,9 +38,11 @@ mod actor_blockstore;
 #[cfg(feature = "fil-actor")]
 pub mod fvm;
 
+pub mod hash_algorithm;
+
 /// Runtime is the VM's internal runtime object.
 /// this is everything that is accessible to actors, beyond parameters.
-pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy + HashAlgorithm {
+pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy {
     /// The network protocol version number at the current epoch.
     fn network_version(&self) -> NetworkVersion;
 
@@ -214,6 +216,9 @@ pub trait Primitives {
 
     #[cfg(feature = "m2-native")]
     fn install_actor(&self, code_cid: &Cid) -> Result<(), anyhow::Error>;
+
+	fn hash_finalize(&self, hash_proc_buff: &[u8]) -> HashedKey;
+
 }
 
 /// filcrypto verification primitives provided by the runtime

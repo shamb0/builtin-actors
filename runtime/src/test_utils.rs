@@ -1356,12 +1356,17 @@ impl MockRuntime {
     }
 }
 
-impl HashAlgorithm for MockRuntime {
+impl HashAlgorithm for &MockRuntime {
     fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
 		let mut hasher = MockRuntimeHasherWrapper::default();
         key.hash(&mut hasher);
         self.finalize(&hasher.0)
     }
+
+	fn rt_hash_get_ref(&self) -> Box<dyn HashAlgorithm> {
+		Box::new(self)
+		// self.boxed()
+	}
 }
 
 #[derive(Default)]

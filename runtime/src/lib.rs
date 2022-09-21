@@ -15,6 +15,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_hamt::{BytesKey, Error as HamtError, Hamt};
 use fvm_shared::bigint::BigInt;
 pub use fvm_shared::BLOCKS_PER_EPOCH as EXPECTED_LEADERS_PER_EPOCH;
+use fvm_shared::runtime::traits::{HashAlgorithm};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use unsigned_varint::decode::Error as UVarintError;
@@ -54,12 +55,12 @@ pub type DealWeight = BigInt;
 
 /// Create a hamt with a custom bitwidth.
 #[inline]
-pub fn make_empty_map<BS, V>(store: &'_ BS, bitwidth: u32) -> Map<'_, BS, V>
+pub fn make_empty_map<BS, V>(store: &'_ BS, bitwidth: u32, hash_algo: Box<dyn HashAlgorithm>) -> Map<'_, BS, V>
 where
     BS: Blockstore,
     V: DeserializeOwned + Serialize,
 {
-    Map::<_, V>::new_with_bit_width(store, bitwidth)
+    Map::<_, V>::new_with_bit_width(store, bitwidth, hash_algo)
 }
 
 /// Create a map with a root cid.
@@ -67,12 +68,13 @@ where
 pub fn make_map_with_root<'bs, BS, V>(
     root: &Cid,
     store: &'bs BS,
+	hash_algo: Box<dyn HashAlgorithm>,
 ) -> Result<Map<'bs, BS, V>, HamtError>
 where
     BS: Blockstore,
     V: DeserializeOwned + Serialize,
 {
-    Map::<_, V>::load_with_bit_width(root, store, HAMT_BIT_WIDTH)
+    Map::<_, V>::load_with_bit_width(root, store, HAMT_BIT_WIDTH, hash_algo)
 }
 
 /// Create a map with a root cid.
@@ -81,12 +83,13 @@ pub fn make_map_with_root_and_bitwidth<'bs, BS, V>(
     root: &Cid,
     store: &'bs BS,
     bitwidth: u32,
+	hash_algo: Box<dyn HashAlgorithm>,
 ) -> Result<Map<'bs, BS, V>, HamtError>
 where
     BS: Blockstore,
     V: DeserializeOwned + Serialize,
 {
-    Map::<_, V>::load_with_bit_width(root, store, bitwidth)
+    Map::<_, V>::load_with_bit_width(root, store, bitwidth, hash_algo)
 }
 
 pub fn u64_key(k: u64) -> BytesKey {

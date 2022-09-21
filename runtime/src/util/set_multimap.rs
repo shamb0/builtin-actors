@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::borrow::Borrow;
+use std::sync::Arc;
 
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
@@ -23,13 +24,13 @@ where
     BS: Blockstore,
 {
     /// Initializes a new empty SetMultimap.
-    pub fn new(bs: &'a BS) -> Self {
-        Self(make_empty_map(bs, HAMT_BIT_WIDTH))
+    pub fn new(bs: &'a BS, hash_algo: Box<dyn HashAlgorithm>) -> Self {
+        Self(make_empty_map(bs, HAMT_BIT_WIDTH, hash_algo))
     }
 
     /// Initializes a SetMultimap from a root Cid.
-    pub fn from_root(bs: &'a BS, cid: &Cid) -> Result<Self, Error> {
-        Ok(Self(make_map_with_root(cid, bs)?))
+    pub fn from_root(bs: &'a BS, cid: &Cid, hash_algo: Box<dyn HashAlgorithm>) -> Result<Self, Error> {
+        Ok(Self(make_map_with_root(cid, bs, hash_algo)?))
     }
 
     /// Retrieve root from the SetMultimap.
@@ -43,18 +44,24 @@ where
         &mut self,
         key: ChainEpoch,
         value: DealID,
-        hash_algo: & dyn HashAlgorithm,
-    ) -> Result<(), Error> {
+		hash_algo1: Box<dyn HashAlgorithm>,
+		hash_algo2: Box<dyn HashAlgorithm>,
+    ) -> Result<(), Error>
+	{
         // Get construct amt from retrieved cid or create new
-        let mut set = self.get(key, hash_algo)?.unwrap_or_else(|| Set::new(self.0.store()));
+        let mut set = self
+					.get(key, hash_algo1)?
+					.unwrap_or_else(||
+						Set::new(self.0.store(), hash_algo2)
+					);
 
-        set.put(u64_key(value), hash_algo)?;
+        set.put(u64_key(value))?;
 
         // Save and calculate new root
         let new_root = set.root()?;
 
         // Set hamt node to set new root
-        self.0.set(u64_key(key as u64), new_root, hash_algo)?;
+        self.0.set(u64_key(key as u64), new_root)?;
         Ok(())
     }
 
@@ -63,20 +70,21 @@ where
         &mut self,
         key: ChainEpoch,
         values: &[DealID],
-        hash_algo: & dyn HashAlgorithm,
+		hash_algo1: Box<dyn HashAlgorithm>,
+		hash_algo2: Box<dyn HashAlgorithm>,
     ) -> Result<(), Error> {
         // Get construct amt from retrieved cid or create new
-        let mut set = self.get(key, hash_algo)?.unwrap_or_else(|| Set::new(self.0.store()));
+        let mut set = self.get(key, hash_algo1)?.unwrap_or_else(|| Set::new(self.0.store(), hash_algo2));
 
         for &v in values {
-            set.put(u64_key(v), hash_algo)?;
+            set.put(u64_key(v))?;
         }
 
         // Save and calculate new root
         let new_root = set.root()?;
 
         // Set hamt node to set new root
-        self.0.set(u64_key(key as u64), new_root, hash_algo)?;
+        self.0.set(u64_key(key as u64), new_root)?;
         Ok(())
     }
 
@@ -85,10 +93,10 @@ where
     pub fn get(
         &self,
         key: ChainEpoch,
-        hash_algo: & dyn HashAlgorithm,
+        hash_algo: Box<dyn HashAlgorithm>,
     ) -> Result<Option<Set<'a, BS>>, Error> {
-        match self.0.get(&u64_key(key as u64), hash_algo)? {
-            Some(cid) => Ok(Some(Set::from_root(*self.0.store(), cid)?)),
+        match self.0.get(&u64_key(key as u64))? {
+            Some(cid) => Ok(Some(Set::from_root(*self.0.store(), cid, hash_algo)?)),
             None => Ok(None),
         }
     }
@@ -99,7 +107,7 @@ where
         &mut self,
         key: ChainEpoch,
         v: DealID,
-        hash_algo: & dyn HashAlgorithm,
+		hash_algo: Box<dyn HashAlgorithm>,
     ) -> Result<(), Error> {
         // Get construct amt from retrieved cid and return if no set exists
         let mut set = match self.get(key, hash_algo)? {
@@ -107,11 +115,11 @@ where
             None => return Ok(()),
         };
 
-        set.delete(u64_key(v).borrow(), hash_algo)?;
+        set.delete(u64_key(v).borrow())?;
 
         // Save and calculate new root
         let new_root = set.root()?;
-        self.0.set(u64_key(key as u64), new_root, hash_algo)?;
+        self.0.set(u64_key(key as u64), new_root)?;
         Ok(())
     }
 
@@ -120,10 +128,9 @@ where
     pub fn remove_all(
         &mut self,
         key: ChainEpoch,
-        hash_algo: & dyn HashAlgorithm,
     ) -> Result<(), Error> {
         // Remove entry from table
-        self.0.delete(&u64_key(key as u64), hash_algo)?;
+        self.0.delete(&u64_key(key as u64))?;
 
         Ok(())
     }
@@ -133,7 +140,7 @@ where
         &self,
         key: ChainEpoch,
         mut f: F,
-        hash_algo: & dyn HashAlgorithm,
+		hash_algo: Box<dyn HashAlgorithm>,
     ) -> Result<(), Error>
     where
         F: FnMut(DealID) -> Result<(), Error>,

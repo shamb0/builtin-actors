@@ -10,7 +10,6 @@ use fvm_shared::HAMT_BIT_WIDTH;
 use crate::{make_empty_map, make_map_with_root, BytesKey, Map};
 
 /// Set is a Hamt with empty values for the purpose of acting as a hash set.
-#[derive(Debug)]
 pub struct Set<'a, BS>(Map<'a, BS, ()>);
 
 impl<'a, BS: Blockstore> PartialEq for Set<'a, BS> {
@@ -24,18 +23,18 @@ where
     BS: Blockstore,
 {
     /// Initializes a new empty Set with the default bitwidth.
-    pub fn new(bs: &'a BS) -> Self {
-        Self(make_empty_map(bs, HAMT_BIT_WIDTH))
+    pub fn new(bs: &'a BS, hash_algo: Box<dyn HashAlgorithm>) -> Self {
+        Self(make_empty_map(bs, HAMT_BIT_WIDTH, hash_algo))
     }
 
     /// Initializes a new empty Set given a bitwidth.
-    pub fn new_set_with_bitwidth(bs: &'a BS, bitwidth: u32) -> Self {
-        Self(make_empty_map(bs, bitwidth))
+    pub fn new_set_with_bitwidth(bs: &'a BS, bitwidth: u32, hash_algo: Box<dyn HashAlgorithm>) -> Self {
+        Self(make_empty_map(bs, bitwidth, hash_algo))
     }
 
     /// Initializes a Set from a root Cid.
-    pub fn from_root(bs: &'a BS, cid: &Cid) -> Result<Self, Error> {
-        Ok(Self(make_map_with_root(cid, bs)?))
+    pub fn from_root(bs: &'a BS, cid: &Cid, hash_algo: Box<dyn HashAlgorithm>) -> Result<Self, Error> {
+        Ok(Self(make_map_with_root(cid, bs, hash_algo)?))
     }
 
     /// Retrieve root from the Set.
@@ -46,16 +45,16 @@ where
 
     /// Adds key to the set.
     #[inline]
-    pub fn put(&mut self, key: BytesKey, hash_algo: & dyn HashAlgorithm) -> Result<(), Error> {
+    pub fn put(&mut self, key: BytesKey) -> Result<(), Error> {
         // Set hamt node to array root
-        self.0.set(key, (), hash_algo)?;
+        self.0.set(key, ())?;
         Ok(())
     }
 
     /// Checks if key exists in the set.
     #[inline]
-    pub fn has(&self, key: &[u8], hash_algo: & dyn HashAlgorithm) -> Result<bool, Error> {
-        self.0.contains_key(key, hash_algo)
+    pub fn has(&self, key: &[u8]) -> Result<bool, Error> {
+        self.0.contains_key(key)
     }
 
     /// Deletes key from set.
@@ -63,9 +62,8 @@ where
     pub fn delete(
         &mut self,
         key: &[u8],
-        hash_algo: & dyn HashAlgorithm,
     ) -> Result<Option<()>, Error> {
-        match self.0.delete(key, hash_algo)? {
+        match self.0.delete(key)? {
             Some(_) => Ok(Some(())),
             None => Ok(None),
         }

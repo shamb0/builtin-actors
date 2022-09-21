@@ -25,19 +25,19 @@ pub enum StorageStatus {
 /// Platform Abstraction Layer
 /// that bridges the FVM world to EVM world
 pub struct System<'r, BS: Blockstore, RT: Runtime<BS>> {
-    pub rt: &'r mut RT,
+    pub rt: &'r RT,
     state: &'r mut Hamt<BS, U256, U256>,
 }
 
 impl<'r, BS: Blockstore, RT: Runtime<BS>> System<'r, BS, RT> {
-    pub fn new(rt: &'r mut RT, state: &'r mut Hamt<BS, U256, U256>) -> anyhow::Result<Self> {
+    pub fn new(rt: &'r RT, state: &'r mut Hamt<BS, U256, U256>) -> anyhow::Result<Self> {
         Ok(Self { rt, state })
     }
 
     /// Reborrow the system with a shorter lifetime.
     #[allow(clippy::needless_lifetimes)]
     pub fn reborrow<'a>(&'a mut self) -> System<'a, BS, RT> {
-        System { rt: &mut *self.rt, state: &mut *self.state }
+        System { rt: & *self.rt, state: &mut *self.state }
     }
 
     pub fn flush_state(&mut self) -> Result<Cid, ActorError> {
@@ -51,7 +51,7 @@ impl<'r, BS: Blockstore, RT: Runtime<BS>> System<'r, BS, RT> {
 
         Ok(self
             .state
-            .get(&key, self.rt)
+            .get(&key)
             .map_err(|e| StatusCode::InternalError(e.to_string()))?
             .cloned())
     }
@@ -67,7 +67,7 @@ impl<'r, BS: Blockstore, RT: Runtime<BS>> System<'r, BS, RT> {
 
         let prev_value = self
             .state
-            .get(&key, self.rt)
+            .get(&key)
             .map_err(|e| StatusCode::InternalError(e.to_string()))?
             .cloned();
 
@@ -76,12 +76,12 @@ impl<'r, BS: Blockstore, RT: Runtime<BS>> System<'r, BS, RT> {
 
         if value.is_none() {
             self.state
-                .delete(&key, self.rt)
+                .delete(&key)
                 .map_err(|e| StatusCode::InternalError(e.to_string()))?;
             storage_status = StorageStatus::Deleted;
         } else {
             self.state
-                .set(key, value.unwrap(), self.rt)
+                .set(key, value.unwrap())
                 .map_err(|e| StatusCode::InternalError(e.to_string()))?;
         }
 
