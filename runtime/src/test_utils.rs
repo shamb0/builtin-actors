@@ -42,6 +42,11 @@ use crate::runtime::{
     ActorCode, DomainSeparationTag, MessageInfo, Policy, Primitives, Runtime, RuntimePolicy,
     Verifier,
 };
+
+use crate::runtime::{
+	hash_algorithm::RuntimeHasherWrapper
+};
+
 use crate::{actor_error, ActorError};
 use libsecp256k1::{recover, Message, RecoveryId, Signature as EcsdaSignature};
 
@@ -1350,36 +1355,22 @@ pub fn new_bls_addr(s: u8) -> Address {
 }
 
 impl MockRuntime {
-    pub fn finalize(&mut self) -> HashedKey {
+    fn hash_finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
         let mut rval: HashedKey = Default::default();
 
         rval.copy_from_slice(
-            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, &self.hash_proc_buff),
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
         );
-
-        self.hash_proc_buff = vec![];
 
         rval
     }
 }
 
-impl Hasher for MockRuntime {
-    fn finish(&self) -> u64 {
-        // u64 hash not used in hamt
-        0
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        self.hash_proc_buff.extend_from_slice(bytes);
-    }
-}
-
-impl HashAlgorithm for MockRuntime {
-    fn rt_hash<X>(&mut self, key: &X) -> HashedKey
-    where
-        X: Hash + ?Sized,
-    {
-        key.hash(self);
-        self.finalize().into()
+impl HashAlgorithm for MockRuntime
+{
+    fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
+		let mut hasher = RuntimeHasherWrapper::default();
+        key.hash(&mut hasher);
+        self.hash_finalize(&hasher.0)
     }
 }

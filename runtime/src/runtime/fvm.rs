@@ -14,6 +14,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::{ErrorNumber, ExitCode};
 use fvm_shared::piece::PieceInfo;
 use fvm_shared::randomness::Randomness;
+use fvm_shared::runtime::traits::{Hash, HashAlgorithm, HashedKey};
 use fvm_shared::sector::{
     AggregateSealVerifyProofAndInfos, RegisteredSealProof, ReplicaUpdateInfo, SealVerifyInfo,
     WindowPoStVerifyInfo,
@@ -30,12 +31,12 @@ use crate::runtime::{
     ActorCode, ConsensusFault, DomainSeparationTag, MessageInfo, Policy, Primitives, RuntimePolicy,
     Verifier,
 };
-use crate::{actor_error, ActorError, Runtime};
 
-use {
-    fvm_ipld_hamt::{Hash, HashAlgorithm, HashedKey},
-    std::hash::Hasher,
+use crate::{
+	hash_algorithm::RuntimeHasherWrapper
 };
+
+use crate::{actor_error, ActorError, Runtime};
 
 lazy_static! {
     /// Cid of the empty array Cbor bytes (`EMPTY_ARR_BYTES`).
@@ -622,30 +623,14 @@ impl<B> FvmRuntime<B>
 where
     B: Blockstore,
 {
-    pub fn finalize(&mut self) -> HashedKey {
+    fn hash_finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
         let mut rval: HashedKey = Default::default();
 
         rval.copy_from_slice(
-            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, &self.hash_proc_buff),
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
         );
 
-        self.hash_proc_buff = vec![];
-
         rval
-    }
-}
-
-impl<B> Hasher for FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn finish(&self) -> u64 {
-        // u64 hash not used in hamt
-        0
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        self.hash_proc_buff.extend_from_slice(bytes);
     }
 }
 
@@ -653,11 +638,9 @@ impl<B> HashAlgorithm for FvmRuntime<B>
 where
     B: Blockstore,
 {
-    fn rt_hash<X>(&mut self, key: &X) -> HashedKey
-    where
-        X: Hash + ?Sized,
-    {
-        key.hash(self);
-        self.finalize().into()
+    fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
+		let mut hasher = RuntimeHasherWrapper::default();
+        key.hash(&mut hasher);
+        self.hash_finalize(&hasher.0)
     }
 }
