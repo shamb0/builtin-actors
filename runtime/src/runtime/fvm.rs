@@ -32,9 +32,7 @@ use crate::runtime::{
     Verifier,
 };
 
-use crate::{
-	hash_algorithm::RuntimeHasherWrapper
-};
+use crate::runtime::hash_algorithm::RuntimeHasherWrapper;
 
 use crate::{actor_error, ActorError, Runtime};
 
@@ -56,8 +54,6 @@ pub struct FvmRuntime<B = ActorBlockstore> {
     caller_validated: bool,
     /// The runtime policy
     policy: Policy,
-	/// Runtime buffer for hash processing
-	hash_proc_buff: Vec<u8>,
 }
 
 impl Default for FvmRuntime {
@@ -67,7 +63,6 @@ impl Default for FvmRuntime {
             in_transaction: false,
             caller_validated: false,
             policy: Policy::default(),
-			hash_proc_buff: vec![],
         }
     }
 }
@@ -574,6 +569,33 @@ where
     }
 }
 
+impl<B> FvmRuntime<B>
+where
+    B: Blockstore,
+{
+    fn hash_finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
+        let mut rval: HashedKey = Default::default();
+
+        rval.copy_from_slice(
+            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
+        );
+
+        rval
+    }
+}
+
+impl<B> HashAlgorithm for FvmRuntime<B>
+where
+    B: Blockstore,
+{
+    fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
+        let mut hasher = RuntimeHasherWrapper::default();
+        key.hash(&mut hasher);
+        self.hash_finalize(&hasher.0)
+    }
+}
+
+
 /// A convenience function that built-in actors can delegate their execution to.
 ///
 /// The trampoline takes care of boilerplate:
@@ -599,7 +621,10 @@ pub fn trampoline<C: ActorCode>(params: u32) -> u32 {
     log::debug!("input params: {:x?}", params.bytes());
 
     // Construct a new runtime.
-    let mut rt = FvmRuntime::default();
+    // let mut rt = FvmRuntime::default();
+	let rt = Rc::new(FvmRuntime::default());
+
+
     // Invoke the method, aborting if the actor returns an errored exit code.
     let ret = C::invoke_method(&mut rt, method, &params)
         .unwrap_or_else(|err| fvm::vm::abort(err.exit_code().value(), Some(err.msg())));
@@ -616,31 +641,5 @@ pub fn trampoline<C: ActorCode>(params: u32) -> u32 {
         NO_DATA_BLOCK_ID
     } else {
         fvm::ipld::put_block(DAG_CBOR, ret.bytes()).expect("failed to write result")
-    }
-}
-
-impl<B> FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn hash_finalize(&self, hash_proc_buff: &[u8]) -> HashedKey {
-        let mut rval: HashedKey = Default::default();
-
-        rval.copy_from_slice(
-            &self.hash(fvm_shared::crypto::hash::SupportedHashes::Sha2_256, hash_proc_buff),
-        );
-
-        rval
-    }
-}
-
-impl<B> HashAlgorithm for FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
-		let mut hasher = RuntimeHasherWrapper::default();
-        key.hash(&mut hasher);
-        self.hash_finalize(&hasher.0)
     }
 }

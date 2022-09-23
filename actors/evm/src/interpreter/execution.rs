@@ -14,7 +14,7 @@ use {
     bytes::Bytes,
     fil_actors_runtime::runtime::Runtime,
     fvm_ipld_blockstore::Blockstore,
-	fvm_ipld_hamt::{HashAlgorithm},
+    fvm_ipld_hamt::HashAlgorithm,
 };
 
 /// EVM execution runtime.
@@ -44,8 +44,8 @@ impl ExecutionState {
 
 pub struct Machine<'r, BS, RT>
 where
-	BS: Blockstore,
-	RT: Runtime<BS> + HashAlgorithm,
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
 {
     system: &'r mut System<'r, BS, RT>,
     runtime: &'r mut ExecutionState,
@@ -96,7 +96,6 @@ macro_rules! def_ins {
         }
     }
 }
-
 
 impl<'r, BS, RT> Machine<'r, BS, RT>
 where

@@ -2,7 +2,7 @@ use {
     crate::interpreter::{ExecutionState, StatusCode, System},
     fil_actors_runtime::runtime::Runtime,
     fvm_ipld_blockstore::Blockstore,
-	fvm_ipld_hamt::{HashAlgorithm},
+    fvm_ipld_hamt::HashAlgorithm,
 };
 
 #[inline]
@@ -11,8 +11,8 @@ pub fn extcodesize<'r, BS, RT>(
     _platform: &'r System<'r, BS, RT>,
 ) -> Result<(), StatusCode>
 where
-	BS: Blockstore,
-	RT: Runtime<BS> + HashAlgorithm
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
 {
     // TODO
     //  1. call actor::get_actor_code_cid
@@ -28,8 +28,8 @@ pub fn extcodehash<'r, BS, RT>(
     _platform: &'r System<'r, BS, RT>,
 ) -> Result<(), StatusCode>
 where
-	BS: Blockstore,
-	RT: Runtime<BS> + HashAlgorithm
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
 {
     // TODO
     todo!();
@@ -40,8 +40,8 @@ pub fn extcodecopy<'r, BS, RT>(
     _platform: &'r System<'r, BS, RT>,
 ) -> Result<(), StatusCode>
 where
-	BS: Blockstore,
-	RT: Runtime<BS> + HashAlgorithm
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
 {
     todo!();
 }

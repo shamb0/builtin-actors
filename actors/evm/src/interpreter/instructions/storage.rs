@@ -2,7 +2,7 @@ use {
     crate::interpreter::{ExecutionState, StatusCode, System, U256},
     fil_actors_runtime::runtime::Runtime,
     fvm_ipld_blockstore::Blockstore,
-	fvm_ipld_hamt::{HashAlgorithm},
+    fvm_ipld_hamt::HashAlgorithm,
 };
 
 #[inline]
@@ -11,8 +11,8 @@ pub fn sload<'r, BS, RT>(
     platform: &'r mut System<'r, BS, RT>,
 ) -> Result<(), StatusCode>
 where
-	BS: Blockstore,
-	RT: Runtime<BS> + HashAlgorithm
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
 {
     // where?
     let location = state.stack.pop()?;
@@ -31,8 +31,8 @@ pub fn sstore<'r, BS, RT>(
     platform: &'r mut System<'r, BS, RT>,
 ) -> Result<(), StatusCode>
 where
-	BS: Blockstore,
-	RT: Runtime<BS> + HashAlgorithm
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
 {
     state.stack.with2(|location, value| {
         let opt_value = if value.is_zero() { None } else { Some(*value) };

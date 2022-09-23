@@ -4,6 +4,7 @@
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{Cbor, RawBytes};
+use fvm_ipld_hamt::HashAlgorithm;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::consensus::ConsensusFault;
@@ -41,7 +42,7 @@ pub mod hash_algorithm;
 
 /// Runtime is the VM's internal runtime object.
 /// this is everything that is accessible to actors, beyond parameters.
-pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy {
+pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy + HashAlgorithm {
     /// The network protocol version number at the current epoch.
     fn network_version(&self) -> NetworkVersion;
 

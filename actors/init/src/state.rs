@@ -13,7 +13,7 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_encoding::Cbor;
 #[cfg(feature = "m2-native")]
 use fvm_ipld_encoding::CborStore;
-use fvm_ipld_hamt::Error as HamtError;
+use fvm_ipld_hamt::{Error as HamtError, HashAlgorithm};
 use fvm_shared::address::{Address, Protocol};
 use fvm_shared::{ActorID, HAMT_BIT_WIDTH};
 
@@ -49,12 +49,13 @@ impl State {
         &mut self,
         store: &BS,
         addr: &Address,
+        hash_algo: &dyn HashAlgorithm,
     ) -> Result<ActorID, HamtError> {
         let id = self.next_id;
         self.next_id += 1;
 
         let mut map = make_map_with_root_and_bitwidth(&self.address_map, store, HAMT_BIT_WIDTH)?;
-        map.set(addr.to_bytes().into(), id)?;
+        map.set(addr.to_bytes().into(), id, hash_algo)?;
         self.address_map = map.flush()?;
 
         Ok(id)
@@ -74,6 +75,7 @@ impl State {
         &self,
         store: &BS,
         addr: &Address,
+        hash_algo: &dyn HashAlgorithm,
     ) -> anyhow::Result<Option<Address>> {
         if addr.protocol() == Protocol::ID {
             return Ok(Some(*addr));
@@ -81,7 +83,7 @@ impl State {
 
         let map = make_map_with_root_and_bitwidth(&self.address_map, store, HAMT_BIT_WIDTH)?;
 
-        Ok(map.get(&addr.to_bytes())?.copied().map(Address::new_id))
+        Ok(map.get(&addr.to_bytes(), hash_algo)?.copied().map(Address::new_id))
     }
 
     /// Check to see if an actor is already installed

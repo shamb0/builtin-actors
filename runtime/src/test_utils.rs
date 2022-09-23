@@ -43,17 +43,12 @@ use crate::runtime::{
     Verifier,
 };
 
-use crate::runtime::{
-	hash_algorithm::RuntimeHasherWrapper
-};
+use crate::runtime::hash_algorithm::RuntimeHasherWrapper;
 
 use crate::{actor_error, ActorError};
 use libsecp256k1::{recover, Message, RecoveryId, Signature as EcsdaSignature};
 
-use {
-    fvm_ipld_hamt::{Hash, HashAlgorithm, HashedKey},
-    std::hash::Hasher,
-};
+use fvm_ipld_hamt::{Hash, HashAlgorithm, HashedKey};
 
 lazy_static! {
     pub static ref SYSTEM_ACTOR_CODE_ID: Cid = make_builtin(b"fil/test/system");
@@ -157,8 +152,6 @@ pub struct MockRuntime {
     pub policy: Policy,
 
     pub circulating_supply: TokenAmount,
-
-    hash_proc_buff: Vec<u8>,
 }
 
 #[derive(Default)]
@@ -297,7 +290,6 @@ impl Default for MockRuntime {
             expectations: Default::default(),
             policy: Default::default(),
             circulating_supply: Default::default(),
-            hash_proc_buff: Default::default(),
         }
     }
 }
@@ -1366,10 +1358,9 @@ impl MockRuntime {
     }
 }
 
-impl HashAlgorithm for MockRuntime
-{
+impl HashAlgorithm for MockRuntime {
     fn rt_hash(&self, key: &dyn Hash) -> HashedKey {
-		let mut hasher = RuntimeHasherWrapper::default();
+        let mut hasher = RuntimeHasherWrapper::default();
         key.hash(&mut hasher);
         self.hash_finalize(&hasher.0)
     }

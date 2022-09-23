@@ -13,8 +13,8 @@ use {
     fil_actors_runtime::runtime::builtins::Type as ActorType,
     fil_actors_runtime::runtime::Runtime,
     fvm_ipld_blockstore::Blockstore,
+    fvm_ipld_hamt::HashAlgorithm,
     fvm_shared::econ::TokenAmount,
-	fvm_ipld_hamt::{HashAlgorithm},
 };
 
 /// The kind of call-like instruction.
@@ -111,8 +111,8 @@ pub fn call<'r, BS, RT>(
     kind: CallKind,
 ) -> Result<(), StatusCode>
 where
-	BS: Blockstore,
-	RT: Runtime<BS> + HashAlgorithm
+    BS: Blockstore,
+    RT: Runtime<BS> + HashAlgorithm,
 {
     let ExecutionState { stack, memory, .. } = state;
     let rt = &*platform.rt; // as immutable reference

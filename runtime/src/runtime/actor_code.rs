@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_hamt::{HashAlgorithm};
 use fvm_ipld_encoding::RawBytes;
+use fvm_ipld_hamt::HashAlgorithm;
 use fvm_shared::MethodNum;
 
 use crate::{ActorError, Runtime};

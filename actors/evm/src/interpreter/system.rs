@@ -64,7 +64,7 @@ where
 
         Ok(self
             .state
-            .get::<_, _>(&key, self.rt)
+            .get::<_>(&key, self.rt)
             .map_err(|e| StatusCode::InternalError(e.to_string()))?
             .cloned())
     }
@@ -80,7 +80,7 @@ where
 
         let prev_value = self
             .state
-            .get::<_, _>(&key, self.rt)
+            .get::<_>(&key, self.rt)
             .map_err(|e| StatusCode::InternalError(e.to_string()))?
             .cloned();
 
@@ -89,12 +89,12 @@ where
 
         if value.is_none() {
             self.state
-                .delete::<_, _>(&key, self.rt)
+                .delete::<_>(&key, self.rt)
                 .map_err(|e| StatusCode::InternalError(e.to_string()))?;
             storage_status = StorageStatus::Deleted;
         } else {
             self.state
-                .set::<_>(key, value.unwrap(), self.rt)
+                .set(key, value.unwrap(), self.rt)
                 .map_err(|e| StatusCode::InternalError(e.to_string()))?;
         }
 
