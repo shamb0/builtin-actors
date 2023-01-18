@@ -15,11 +15,11 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 fil_actors_runtime = { version = "10.0.0-alpha.1", path = "../../runtime" }
-frc42_dispatch = "3.0.0"
-fvm_shared = { version = "3.0.0-alpha.16", default-features = false }
-fvm_ipld_bitfield = "0.5.4"
-fvm_ipld_amt = { version = "0.5.0", features = ["go-interop"] }
-fvm_ipld_hamt = "0.6.1"
+frc42_dispatch = { version = "3.0.0", git = "https://github.com/shamb0/filecoin-actor-utils.git", branch = "shamb0/feat/fvm-m2/crates-registry-refactor" }
+fvm_shared = { version = "3.0.0-alpha.16", git = "https://github.com/filecoin-project/ref-fvm", default-features = false }
+fvm_ipld_bitfield = { version = "0.5.4", git = "https://github.com/filecoin-project/ref-fvm" }
+fvm_ipld_amt = { version = "0.5.0", git = "https://github.com/filecoin-project/ref-fvm", features = ["go-interop"] }
+fvm_ipld_hamt = { version = "0.6.1", git = "https://github.com/filecoin-project/ref-fvm" }
 serde = { version = "1.0.136", features = ["derive"] }
 cid = { version = "0.8.3", default-features = false, features = ["serde-codec"] }
 num-traits = "0.2.14"
@@ -29,8 +29,8 @@ log = "0.4.14"
 byteorder = "1.4.3"
 anyhow = "1.0.65"
 itertools = "0.10.3"
-fvm_ipld_blockstore = "0.1.1"
-fvm_ipld_encoding = "0.3.2"
+fvm_ipld_blockstore = { version = "0.1.1", git = "https://github.com/filecoin-project/ref-fvm" }
+fvm_ipld_encoding = { version = "0.3.2", git = "https://github.com/filecoin-project/ref-fvm" }
 multihash = { version = "0.16.2", default-features = false }
 
 [dev-dependencies]
